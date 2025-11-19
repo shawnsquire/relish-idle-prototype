@@ -12,13 +12,21 @@ export class CombatPhase {
   gameOver: boolean = false;
   private mouseDownHandler: (e: MouseEvent) => void;
   private mouseUpHandler: (e: MouseEvent) => void;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private gameState: GameState;
+  private onGameOver: () => void;
 
   constructor(
-    private canvas: HTMLCanvasElement,
-    private ctx: CanvasRenderingContext2D,
-    private gameState: GameState,
-    private onGameOver: () => void
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D,
+    gameState: GameState,
+    onGameOver: () => void
   ) {
+    this.canvas = canvas;
+    this.ctx = ctx;
+    this.gameState = gameState;
+    this.onGameOver = onGameOver;
     this.player = new Player(canvas.width, canvas.height);
     // Don't spawn minions automatically anymore
     // Spawn first enemy immediately
@@ -58,7 +66,7 @@ export class CombatPhase {
     }
   }
 
-  handleMouseUp(e: MouseEvent) {
+  handleMouseUp(_e: MouseEvent) {
     if (this.gameOver) return;
 
     if (this.player.isCasting) {
@@ -155,7 +163,7 @@ export class CombatPhase {
       this.gameState.currentQuestKills += deadEnemies.length;
 
       // Roll for bone drops
-      for (const enemy of deadEnemies) {
+      for (const _enemy of deadEnemies) {
         if (Math.random() < Config.ENEMY.BONE_DROP_CHANCE) {
           this.gameState.bones += Config.ENEMY.BONES_PER_DROP;
         }

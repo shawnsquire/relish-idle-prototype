@@ -69,7 +69,7 @@ export class Minion {
 
         // If can't reach target (blocked), find new one
         if (!moved && distance > attackRange + 10) {
-          this.target = this.findAccessibleEnemy(enemies, minions);
+          this.target = this.findAccessibleEnemy(enemies);
         }
       }
       // If in attack range, stop moving and just attack
@@ -77,7 +77,7 @@ export class Minion {
       // Attack if in range
       if (distance <= attackRange && this.attackCooldown <= 0) {
         // Roll for hit
-        if (Math.random() < this.hitChance) {
+        if (Math.random() < this.hitChance && this.target) {
           this.target.takeDamage(this.damage);
         }
         this.attackCooldown = 1 / Config.MINION.ATTACK_SPEED;
@@ -177,7 +177,7 @@ export class Minion {
     return nearest;
   }
 
-  findAccessibleEnemy(enemies: Enemy[], minions: Minion[]): Enemy | null {
+  findAccessibleEnemy(enemies: Enemy[]): Enemy | null {
     // Try to find an enemy that isn't completely surrounded
     const liveEnemies = enemies.filter(e => !e.isDead);
     if (liveEnemies.length === 0) return null;
