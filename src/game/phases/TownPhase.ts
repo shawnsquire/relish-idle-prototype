@@ -4,8 +4,10 @@ import { GameState } from '../GameState';
 export class TownPhase {
   private townUI: HTMLElement;
   private onStartQuest: () => void;
+  private gameState: GameState;
 
-  constructor(private gameState: GameState, onStartQuest: () => void) {
+  constructor(gameState: GameState, onStartQuest: () => void) {
+    this.gameState = gameState;
     this.townUI = document.getElementById('townUI')!;
     this.onStartQuest = onStartQuest;
     this.render();
@@ -78,7 +80,7 @@ export class TownPhase {
     this.attachEventListeners();
   }
 
-  renderBuilding(building: typeof Config.TOWN.BUILDINGS[0]) {
+  renderBuilding(building: (typeof Config.TOWN.BUILDINGS)[number]) {
     return `
       <div class="building">
         <div class="building-name">${building.name}</div>
@@ -89,7 +91,7 @@ export class TownPhase {
     `;
   }
 
-  renderJob(buildingId: string, job: typeof Config.TOWN.BUILDINGS[0]['jobs'][0]) {
+  renderJob(buildingId: string, job: (typeof Config.TOWN.BUILDINGS)[number]['jobs'][number]) {
     const assigned = this.gameState.getAssignedCount(buildingId, job.id);
     const canAssign = this.gameState.availableMinions > 0;
     const canUnassign = assigned > 0;

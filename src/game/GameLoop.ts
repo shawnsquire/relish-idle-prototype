@@ -12,11 +12,15 @@ export class GameLoop {
   private summonBarElement: HTMLElement;
   private gameOverActive: boolean = false;
   private restartClickHandler: ((e: MouseEvent) => void) | null = null;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
 
   constructor(
-    private canvas: HTMLCanvasElement,
-    private ctx: CanvasRenderingContext2D
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D
   ) {
+    this.canvas = canvas;
+    this.ctx = ctx;
     this.gameState = new GameState();
     this.hudElement = document.getElementById('hud')!;
     this.summonBarElement = document.getElementById('summonBar')!;
