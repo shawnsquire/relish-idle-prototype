@@ -42,11 +42,33 @@ The repository includes a GitHub Actions workflow that automatically:
 - Builds the Docker image on every push to `main`/`master`
 - Pushes the image to GitHub Container Registry (ghcr.io)
 - Tags images with branch name, commit SHA, and `latest`
+- **Automatically deploys to your server** (pulls new image and restarts container)
 
 ### Setup
 
 1. **Enable GitHub Packages**: The workflow uses `GITHUB_TOKEN` (automatically available)
-2. **Manual Trigger**: You can also trigger builds manually from the Actions tab
+
+2. **Configure Server Secrets**: Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
+   - `SSH_PRIVATE_KEY`: Your SSH private key for server access
+   - `SERVER_HOST`: Your server's hostname or IP address
+   - `SERVER_USER`: SSH username (e.g., `root` or your user)
+
+3. **Ensure Docker is installed on your server**: The deployment job expects Docker to be available
+
+4. **Manual Trigger**: You can also trigger builds and deployments manually from the Actions tab
+
+### How Auto-Deploy Works
+
+When you push to `main`/`master`:
+1. GitHub Actions builds the Docker image
+2. Image is pushed to `ghcr.io/OWNER/REPO:latest`
+3. GitHub Actions SSHs into your server
+4. Pulls the latest image
+5. Stops the old `relish-idle` container
+6. Starts a new container with the updated image
+7. Cleans up old Docker images
+
+No manual intervention required! 🎉
 
 ### Pull the Pre-built Image
 
@@ -65,9 +87,11 @@ Replace `OWNER/REPO` with your GitHub username and repository name.
 
 ## 🔧 Server Deployment with Nginx Reverse Proxy
 
+> **Note**: This section covers **initial setup only**. After the first deployment, GitHub Actions will automatically handle updates when you push to `main`/`master`.
+
 ### On Your Server
 
-1. **Pull and run the container**:
+1. **Initial container deployment** (only needed once):
    ```bash
    docker pull ghcr.io/OWNER/REPO:latest
    docker run -d \
@@ -111,9 +135,11 @@ Replace `OWNER/REPO` with your GitHub username and repository name.
    sudo certbot --nginx -d your-domain.com
    ```
 
-### Auto-Update Script
+### Manual Update Script (Optional)
 
-Create a script to automatically pull and restart:
+> **Note**: With GitHub Actions auto-deploy enabled, this script is **no longer needed** for regular updates. Keep it as a fallback for manual deployments if needed.
+
+Create a script to manually pull and restart:
 
 ```bash
 #!/bin/bash
@@ -144,18 +170,20 @@ Make it executable:
 chmod +x update-relish-idle.sh
 ```
 
-### Setup Auto-Update with Webhook (Optional)
+### Alternative: Watchtower (Not Recommended)
 
-You can use [webhook](https://github.com/adnanh/webhook) to automatically update when GitHub pushes:
+> **Note**: With GitHub Actions auto-deploy, Watchtower is **not recommended** as it may cause conflicts. GitHub Actions provides better control and visibility.
 
-1. Install webhook:
-   ```bash
-   sudo apt-get install webhook
-   ```
+If you prefer container-based auto-updates, you can use [Watchtower](https://containrrr.dev/watchtower/):
 
-2. Create webhook configuration and point it to your update script
-
-3. Add the webhook URL to your GitHub repository settings
+```bash
+docker run -d \
+  --name watchtower \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  containrrr/watchtower \
+  relish-idle \
+  --interval 300
+```
 
 ## 🏥 Health Checks
 
