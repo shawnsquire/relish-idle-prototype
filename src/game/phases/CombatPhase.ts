@@ -41,9 +41,17 @@ export class CombatPhase {
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const touch = e.touches[0];
+      // Get canvas rect for proper coordinate conversion
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      // Convert touch coordinates to canvas coordinates
+      const canvasX = (touch.clientX - rect.left) * scaleX;
+      const canvasY = (touch.clientY - rect.top) * scaleY;
+      // Create mouse event with canvas-space coordinates
       const mouseEvent = new MouseEvent('mousedown', {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
+        clientX: canvasX + rect.left,
+        clientY: canvasY + rect.top,
       });
       this.handleMouseDown(mouseEvent);
     });
