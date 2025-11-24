@@ -5,10 +5,23 @@ on:
     branches:
       - main
       - master
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/docker-deploy.yml'
   pull_request:
     branches:
       - main
       - master
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
 
 env:
