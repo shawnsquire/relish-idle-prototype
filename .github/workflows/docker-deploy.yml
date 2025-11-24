@@ -79,10 +79,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
 
-          # Login to GitHub Container Registry
-          echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          # Pull the latest image
+          # Pull the latest image (no auth needed for public images)
           docker pull ghcr.io/${{ github.repository }}:latest
 
           # Stop and remove old container if it exists
