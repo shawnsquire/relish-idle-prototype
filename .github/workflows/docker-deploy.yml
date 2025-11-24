@@ -77,27 +77,18 @@ jobs:
       - name: Deploy Docker container to server
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
-
-          # Pull the latest image (no auth needed for public images)
-          docker pull ghcr.io/${{ github.repository }}:latest
-
-          # Stop and remove old container if it exists
-          docker stop relish-idle 2>/dev/null || true
-          docker rm relish-idle 2>/dev/null || true
-
-          # Start new container
-          docker run -d \
-            --name relish-idle \
-            --restart unless-stopped \
-            -p 127.0.0.1:3030:80 \
-            ghcr.io/${{ github.repository }}:latest
-
-          # Clean up old images
-          docker image prune -f
-
-          echo "Deployment complete!"
-          ENDSSH
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin && \
+             docker pull ghcr.io/${{ github.repository }}:latest && \
+             docker stop relish-idle 2>/dev/null || true && \
+             docker rm relish-idle 2>/dev/null || true && \
+             docker run -d \
+               --name relish-idle \
+               --restart unless-stopped \
+               -p 127.0.0.1:3030:80 \
+               ghcr.io/${{ github.repository }}:latest && \
+             docker image prune -f && \
+             echo 'Deployment complete!'"
 
       - name: Cleanup
         if: always()
