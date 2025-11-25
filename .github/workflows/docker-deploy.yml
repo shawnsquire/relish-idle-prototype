@@ -91,17 +91,34 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin && \
-             docker pull ghcr.io/${{ github.repository }}:latest && \
-             docker stop relish-idle 2>/dev/null || true && \
-             docker rm relish-idle 2>/dev/null || true && \
-             docker run -d \
-               --name relish-idle \
-               --restart unless-stopped \
-               -p 127.0.0.1:3030:80 \
-               ghcr.io/${{ github.repository }}:latest && \
-             docker image prune -f && \
-             echo 'Deployment complete!'"
+            "GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+             GITHUB_ACTOR='${{ github.actor }}' \
+             IMAGE_REPO='${{ github.repository }}' \
+             bash -s" << 'ENDSSH'
+          set -e
+
+          echo "Logging into GitHub Container Registry..."
+          echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+          echo "Pulling latest image..."
+          docker pull "ghcr.io/${IMAGE_REPO}:latest"
+
+          echo "Stopping existing container..."
+          docker stop relish-idle 2>/dev/null || true
+          docker rm relish-idle 2>/dev/null || true
+
+          echo "Starting new container..."
+          docker run -d \
+            --name relish-idle \
+            --restart unless-stopped \
+            -p 127.0.0.1:3030:80 \
+            "ghcr.io/${IMAGE_REPO}:latest"
+
+          echo "Cleaning up old images..."
+          docker image prune -f
+
+          echo "Deployment complete!"
+          ENDSSH
 
       - name: Cleanup
         if: always()
