@@ -80,10 +80,16 @@ jobs:
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
+      - name: Setup SSH with agent
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          eval $(ssh-agent -s)
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | ssh-add -
+
       - name: Deploy Docker container to server
         run: |
-          ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
             "GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
              GITHUB_ACTOR='${{ github.actor }}' \
              IMAGE_REPO='${{ github.repository }}' \
