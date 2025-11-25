@@ -80,16 +80,9 @@ jobs:
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
       - name: Deploy Docker container to server
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
             "GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
              GITHUB_ACTOR='${{ github.actor }}' \
@@ -119,7 +112,3 @@ jobs:
 
           echo "Deployment complete!"
           ENDSSH
-
-      - name: Cleanup
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
