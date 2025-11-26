@@ -103,9 +103,20 @@ jobs:
           echo "Pulling latest image..."
           docker pull "ghcr.io/${IMAGE_REPO}:latest"
 
-          echo "Stopping existing container..."
+          echo "Stopping and removing existing container..."
+          # Stop and remove container by name
           docker stop relish-idle 2>/dev/null || true
-          docker rm relish-idle 2>/dev/null || true
+          docker rm -f relish-idle 2>/dev/null || true
+
+          # Force remove any containers using port 3030
+          CONTAINERS_ON_PORT=$(docker ps -a --filter "publish=3030" -q)
+          if [ ! -z "$CONTAINERS_ON_PORT" ]; then
+            echo "Found containers using port 3030, removing..."
+            docker rm -f $CONTAINERS_ON_PORT
+          fi
+
+          # Wait a moment to ensure cleanup is complete
+          sleep 2
 
           echo "Starting new container..."
           docker run -d \
