@@ -94,4 +94,11 @@ export const Config = {
     BONE_COST: 3, // Bones needed per ritual
     MINIONS_GAINED: 1, // Minions created per ritual
   },
+  // Spell casting
+  SPELL: {
+    RUNE_HIT_RADIUS: 40,
+    MIN_RUNES: 2,
+    COOLDOWN: 0.5,
+    INCANTATION_DISPLAY_TIME: 3.0,
+  },
 } as const;

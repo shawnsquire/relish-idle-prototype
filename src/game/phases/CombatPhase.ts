@@ -3,6 +3,10 @@ import { GameState } from '../GameState';
 import { Player } from '../../entities/Player';
 import { Minion } from '../../entities/Minion';
 import { Enemy } from '../../entities/Enemy';
+import { GestureTracker } from '../spells/GestureTracker';
+import { SpellRenderer } from '../spells/SpellRenderer';
+import { RUNES } from '../spells/Runes';
+import { resolveSpell, type SpellEffect } from '../spells/SpellResolver';
 
 export class CombatPhase {
   player: Player;
@@ -10,8 +14,26 @@ export class CombatPhase {
   enemies: Enemy[] = [];
   enemySpawnTimer: number = 0;
   gameOver: boolean = false;
+  lastCastName: string = '';
+  lastCastTimer: number = 0;
+
+  private gestureTracker: GestureTracker;
+  spellRenderer: SpellRenderer;
+  private prevRuneCount = 0;
+
+  // Pointer held state for auto-start after unwind
+  private pointerHeld = false;
+  private pointerX = 0;
+  private pointerY = 0;
+  private wasUnwinding = false;
+
   private mouseDownHandler: (e: MouseEvent) => void;
+  private mouseMoveHandler: (e: MouseEvent) => void;
   private mouseUpHandler: (e: MouseEvent) => void;
+  private touchStartHandler: (e: TouchEvent) => void;
+  private touchMoveHandler: (e: TouchEvent) => void;
+  private touchEndHandler: (e: TouchEvent) => void;
+
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private gameState: GameState;
@@ -28,86 +50,144 @@ export class CombatPhase {
     this.gameState = gameState;
     this.onGameOver = onGameOver;
     this.player = new Player(canvas.width, canvas.height);
-    // Don't spawn minions automatically anymore
+    this.gestureTracker = new GestureTracker();
+    this.spellRenderer = new SpellRenderer();
+
     // Spawn first enemy immediately
     this.spawnEnemy();
 
-    // Setup mouse handlers for hold-to-cast
-    this.mouseDownHandler = (e: MouseEvent) => this.handleMouseDown(e);
-    this.mouseUpHandler = (e: MouseEvent) => this.handleMouseUp(e);
-    canvas.addEventListener('mousedown', this.mouseDownHandler);
-    canvas.addEventListener('mouseup', this.mouseUpHandler);
-    // Also handle touch events for mobile
-    canvas.addEventListener('touchstart', (e) => {
+    // Setup input handlers
+    this.mouseDownHandler = (e: MouseEvent) => this.handlePointerDown(e.clientX, e.clientY);
+    this.mouseMoveHandler = (e: MouseEvent) => this.handlePointerMove(e.clientX, e.clientY);
+    this.mouseUpHandler = () => this.handlePointerUp();
+
+    this.touchStartHandler = (e: TouchEvent) => {
       e.preventDefault();
       const touch = e.touches[0];
-      // Get canvas rect for proper coordinate conversion
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      // Convert touch coordinates to canvas coordinates
-      const canvasX = (touch.clientX - rect.left) * scaleX;
-      const canvasY = (touch.clientY - rect.top) * scaleY;
-      // Create mouse event with canvas-space coordinates
-      const mouseEvent = new MouseEvent('mousedown', {
-        clientX: canvasX + rect.left,
-        clientY: canvasY + rect.top,
-      });
-      this.handleMouseDown(mouseEvent);
-    });
-    canvas.addEventListener('touchend', (e) => {
+      this.handlePointerDown(touch.clientX, touch.clientY);
+    };
+    this.touchMoveHandler = (e: TouchEvent) => {
       e.preventDefault();
-      const mouseEvent = new MouseEvent('mouseup', {});
-      this.handleMouseUp(mouseEvent);
-    });
+      const touch = e.touches[0];
+      this.handlePointerMove(touch.clientX, touch.clientY);
+    };
+    this.touchEndHandler = (e: TouchEvent) => {
+      e.preventDefault();
+      this.handlePointerUp();
+    };
+
+    canvas.addEventListener('mousedown', this.mouseDownHandler);
+    canvas.addEventListener('mousemove', this.mouseMoveHandler);
+    canvas.addEventListener('mouseup', this.mouseUpHandler);
+    canvas.addEventListener('touchstart', this.touchStartHandler);
+    canvas.addEventListener('touchmove', this.touchMoveHandler);
+    canvas.addEventListener('touchend', this.touchEndHandler);
   }
 
-  handleMouseDown(e: MouseEvent) {
+  private handlePointerDown(clientX: number, clientY: number) {
     if (this.gameOver) return;
-
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    this.pointerX = clientX - rect.left;
+    this.pointerY = clientY - rect.top;
+    this.pointerHeld = true;
 
-    if (this.player.isClicked(x, y)) {
-      this.player.startCast();
+    // Only start gesture if not unwinding
+    if (!this.spellRenderer.isUnwinding) {
+      this.beginGesture(this.pointerX, this.pointerY);
     }
   }
 
-  handleMouseUp(_e: MouseEvent) {
+  private handlePointerMove(clientX: number, clientY: number) {
     if (this.gameOver) return;
+    const rect = this.canvas.getBoundingClientRect();
+    this.pointerX = clientX - rect.left;
+    this.pointerY = clientY - rect.top;
 
-    if (this.player.isCasting) {
-      const success = this.player.finishCast();
-      if (success) {
-        this.summonMinion();
+    if (!this.gestureTracker.isActive) return;
+
+    this.gestureTracker.updateGesture(this.pointerX, this.pointerY);
+
+    // Check for new rune hits to trigger flash
+    const seq = this.gestureTracker.currentSequence;
+    if (seq.length > this.prevRuneCount) {
+      for (let i = this.prevRuneCount; i < seq.length; i++) {
+        this.spellRenderer.onRuneHit(seq[i]);
       }
-      // If not successful, it just fizzles (does nothing)
+      this.prevRuneCount = seq.length;
     }
   }
 
-  summonMinion() {
-    // Check if we can summon more minions
-    if (this.minions.length >= this.gameState.availableMinions) {
-      return; // Can't summon more than available
-    }
+  private handlePointerUp() {
+    this.pointerHeld = false;
 
-    // Spawn a new minion near the player
+    if (this.gameOver || !this.gestureTracker.isActive) return;
+
+    const result = this.gestureTracker.endGesture();
+
+    const spell = resolveSpell(
+      result,
+      this.gameState.damageMultiplier,
+      this.gameState.speedMultiplier
+    );
+
+    if (spell) {
+      this.castSpell(spell);
+    } else if (result.runeSequence.length > 0) {
+      this.spellRenderer.onFizzle();
+    }
+  }
+
+  private beginGesture(x: number, y: number) {
+    this.gestureTracker.setCanvasSize(this.canvas.width, this.canvas.height);
+    this.gestureTracker.startGesture(x, y);
+    this.prevRuneCount = 0;
+
+    // Check immediate rune hits
+    const seq = this.gestureTracker.currentSequence;
+    if (seq.length > 0) {
+      for (let i = 0; i < seq.length; i++) {
+        this.spellRenderer.onRuneHit(seq[i]);
+      }
+      this.prevRuneCount = seq.length;
+    }
+  }
+
+  private castSpell(spell: SpellEffect) {
     const angle = Math.random() * Math.PI * 2;
     const distance = 30;
     const x = this.player.x + Math.cos(angle) * distance;
     const y = this.player.y + Math.sin(angle) * distance;
 
-    this.minions.push(
-      new Minion(
-        x,
-        y,
-        this.gameState.speedMultiplier,
-        this.gameState.damageMultiplier
-      )
-    );
+    const minion = Minion.fromSpell(x, y, spell);
+    minion.setContext(this.minions, this.enemies, (sx, sy) => this.spawnTinyMinion(sx, sy));
+    this.minions.push(minion);
 
-    this.gameState.liveMinionsInCombat = this.minions.length;
+    // Get trail color from last rune in sequence
+    const seq = spell.archetype.runeSequence;
+    const lastRuneColor = RUNES[seq[seq.length - 1]].color;
+
+    // Pass the trail path to the renderer for unwind
+    this.spellRenderer.onSpellCast(
+      spell.archetype,
+      this.gestureTracker.currentPath,
+      lastRuneColor
+    );
+    this.lastCastName = spell.archetype.name;
+    this.lastCastTimer = 3;
+
+    this.gameState.liveMinionsInCombat = this.minions.filter(m => !m.isDead).length;
+  }
+
+  private spawnTinyMinion(x: number, y: number) {
+    const m = new Minion(x, y, this.gameState.speedMultiplier, this.gameState.damageMultiplier);
+    m.size = 4;
+    m.health = 8;
+    m.maxHealth = 8;
+    m.damage = 2;
+    m.speed = 80;
+    m.color = '#b8a880';
+    m.archetype = 'spawned';
+    this.minions.push(m);
   }
 
   spawnEnemy() {
@@ -118,14 +198,33 @@ export class CombatPhase {
 
   cleanup() {
     this.canvas.removeEventListener('mousedown', this.mouseDownHandler);
+    this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
     this.canvas.removeEventListener('mouseup', this.mouseUpHandler);
+    this.canvas.removeEventListener('touchstart', this.touchStartHandler);
+    this.canvas.removeEventListener('touchmove', this.touchMoveHandler);
+    this.canvas.removeEventListener('touchend', this.touchEndHandler);
   }
 
   update(deltaTime: number) {
     if (this.gameOver) return;
 
-    // Update player (cooldown)
+    // Update player
     this.player.update(deltaTime);
+
+    // Update spell renderer
+    this.spellRenderer.update(deltaTime);
+    this.gestureTracker.setCanvasSize(this.canvas.width, this.canvas.height);
+
+    // Auto-start gesture when unwind finishes while pointer is held
+    if (this.wasUnwinding && !this.spellRenderer.isUnwinding && this.pointerHeld) {
+      this.beginGesture(this.pointerX, this.pointerY);
+    }
+    this.wasUnwinding = this.spellRenderer.isUnwinding;
+
+    // Last cast name timer
+    if (this.lastCastTimer > 0) {
+      this.lastCastTimer -= deltaTime;
+    }
 
     // Update combat timer
     this.gameState.combatTimer -= deltaTime * 1000;
@@ -142,8 +241,23 @@ export class CombatPhase {
       this.enemySpawnTimer = 0;
     }
 
+    // Reset taunt targets each frame
+    for (const enemy of this.enemies) {
+      if (!enemy.isDead) {
+        enemy.tauntTarget = null;
+      }
+    }
+
+    // Reset frame buffs on minions
+    for (const minion of this.minions) {
+      if (!minion.isDead) {
+        minion.resetFrameBuffs();
+      }
+    }
+
     // Update minions
     for (const minion of this.minions) {
+      minion.setContext(this.minions, this.enemies, (sx, sy) => this.spawnTinyMinion(sx, sy));
       minion.update(deltaTime, this.enemies, this.minions, this.player.x, this.player.y);
     }
 
@@ -151,12 +265,11 @@ export class CombatPhase {
     for (const enemy of this.enemies) {
       enemy.update(deltaTime, this.player.x, this.player.y, this.minions, this.enemies);
 
-      // Check if enemy reached player (game over)
       if (!this.gameOver) {
-        const distance = Math.sqrt(
+        const dist = Math.sqrt(
           (enemy.x - this.player.x) ** 2 + (enemy.y - this.player.y) ** 2
         );
-        if (distance < (this.player.size + enemy.size) / 2) {
+        if (dist < (this.player.size + enemy.size) / 2) {
           this.gameOver = true;
           this.cleanup();
           this.onGameOver();
@@ -170,7 +283,6 @@ export class CombatPhase {
     if (deadEnemies.length > 0) {
       this.gameState.currentQuestKills += deadEnemies.length;
 
-      // Roll for bone drops
       for (const _enemy of deadEnemies) {
         if (Math.random() < Config.ENEMY.BONE_DROP_CHANCE) {
           this.gameState.bones += Config.ENEMY.BONES_PER_DROP;
@@ -181,41 +293,31 @@ export class CombatPhase {
     }
 
     // Track and remove dead minions
-    const deadMinions = this.minions.filter((m) => m.isDead);
+    const deadMinions = this.minions.filter((m) => m.isDead && m.archetype !== 'spawned');
     if (deadMinions.length > 0) {
-      // Permanently lose these minions
       this.gameState.loseMinionsPermanently(deadMinions.length);
     }
     this.minions = this.minions.filter((m) => !m.isDead);
 
-    // Update live minion count
     this.gameState.liveMinionsInCombat = this.minions.length;
   }
 
   draw() {
-    // Clear canvas
     this.ctx.fillStyle = '#0a0a0a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Draw player
     this.player.draw(this.ctx);
 
-    // Draw minions
     for (const minion of this.minions) {
       minion.draw(this.ctx);
     }
 
-    // Draw enemies
     for (const enemy of this.enemies) {
       enemy.draw(this.ctx);
     }
 
-    // Debug info
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '16px Arial';
-    this.ctx.fillText(`Minions: ${this.minions.length} | Enemies: ${this.enemies.length}`, 10, this.canvas.height - 10);
+    this.spellRenderer.draw(this.ctx, this.gestureTracker, this.canvas.width, this.canvas.height);
 
-    // Game over overlay
     if (this.gameOver) {
       this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);

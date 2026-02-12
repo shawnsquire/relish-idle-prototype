@@ -13,6 +13,15 @@ export class Enemy {
   attackCooldown: number = 0;
   isDead: boolean = false;
 
+  // Debuffs
+  speedDebuff: number = 0; // 0-1 multiplier reduction
+  speedDebuffTimer: number = 0;
+  rootTimer: number = 0;
+  missChance: number = 0;
+
+  // Force-target override (for taunt)
+  tauntTarget: Minion | null = null;
+
   constructor(x: number) {
     this.x = x;
     this.y = Config.COMBAT.ENEMY_SPAWN_Y;
@@ -27,9 +36,37 @@ export class Enemy {
   update(deltaTime: number, playerX: number, playerY: number, minions: Minion[], enemies: Enemy[]) {
     if (this.isDead) return;
 
+    // Decrement debuff timers
+    if (this.speedDebuffTimer > 0) {
+      this.speedDebuffTimer -= deltaTime;
+      if (this.speedDebuffTimer <= 0) {
+        this.speedDebuff = 0;
+        this.speedDebuffTimer = 0;
+      }
+    }
+    if (this.rootTimer > 0) {
+      this.rootTimer -= deltaTime;
+      if (this.rootTimer < 0) this.rootTimer = 0;
+    }
+    // Miss chance resets each frame (re-applied by auras)
+    this.missChance = 0;
+
     // Update attack cooldown
     if (this.attackCooldown > 0) {
       this.attackCooldown -= deltaTime;
+    }
+
+    // If taunted, prefer that target
+    if (this.tauntTarget && !this.tauntTarget.isDead) {
+      const dist = this.distanceTo(this.tauntTarget.x, this.tauntTarget.y);
+      const attackDist = Config.ENEMY.ATTACK_RANGE + (this.size + this.tauntTarget.size) / 2;
+      if (dist <= attackDist && this.attackCooldown <= 0) {
+        if (Math.random() >= this.missChance) {
+          this.tauntTarget.takeDamage(this.damage);
+        }
+        this.attackCooldown = 1 / Config.ENEMY.ATTACK_SPEED;
+        return;
+      }
     }
 
     // Attack nearby minions
@@ -38,20 +75,36 @@ export class Enemy {
       const distance = this.distanceTo(minion.x, minion.y);
       if (distance <= Config.ENEMY.ATTACK_RANGE + (this.size + minion.size) / 2) {
         if (this.attackCooldown <= 0) {
-          minion.takeDamage(this.damage);
+          // Roll miss chance
+          if (Math.random() >= this.missChance) {
+            minion.takeDamage(this.damage);
+          }
           this.attackCooldown = 1 / Config.ENEMY.ATTACK_SPEED;
         }
         return; // Stop moving if attacking
       }
     }
 
-    // Move towards player with collision detection and sliding
-    const dx = playerX - this.x;
-    const dy = playerY - this.y;
+    // Skip movement if rooted
+    if (this.rootTimer > 0) return;
+
+    // Effective speed with debuff
+    const effectiveSpeed = this.speed * (1 - this.speedDebuff);
+
+    // Move towards taunt target or player
+    let targetX = playerX;
+    let targetY = playerY;
+    if (this.tauntTarget && !this.tauntTarget.isDead) {
+      targetX = this.tauntTarget.x;
+      targetY = this.tauntTarget.y;
+    }
+
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance > this.size) {
-      const moveDistance = this.speed * deltaTime;
+      const moveDistance = effectiveSpeed * deltaTime;
 
       // Try direct path first
       let newX = this.x + (dx / distance) * moveDistance;
@@ -65,10 +118,10 @@ export class Enemy {
 
       // If blocked, try sliding around
       const angles = [
-        Math.PI / 4,   // 45 degrees right
-        -Math.PI / 4,  // 45 degrees left
-        Math.PI / 2,   // 90 degrees right
-        -Math.PI / 2,  // 90 degrees left
+        Math.PI / 4,
+        -Math.PI / 4,
+        Math.PI / 2,
+        -Math.PI / 2,
       ];
 
       for (const angleOffset of angles) {
@@ -82,6 +135,22 @@ export class Enemy {
           return;
         }
       }
+    }
+  }
+
+  applySpeedDebuff(percent: number, duration: number) {
+    // Take the strongest debuff
+    if (percent > this.speedDebuff) {
+      this.speedDebuff = percent;
+    }
+    if (duration > this.speedDebuffTimer) {
+      this.speedDebuffTimer = duration;
+    }
+  }
+
+  applyRoot(duration: number) {
+    if (duration > this.rootTimer) {
+      this.rootTimer = duration;
     }
   }
 
@@ -135,7 +204,6 @@ export class Enemy {
     if (healthPercent < 1) {
       yOffset -= healthBarHeight + 2;
 
-      // Health bar background
       ctx.fillStyle = '#D00';
       ctx.fillRect(
         this.x - barWidth / 2,
@@ -144,7 +212,6 @@ export class Enemy {
         healthBarHeight
       );
 
-      // Health bar foreground
       ctx.fillStyle = '#00ff00';
       ctx.fillRect(
         this.x - barWidth / 2,
@@ -154,7 +221,7 @@ export class Enemy {
       );
     }
 
-    // Only show attack bar if has attacked (cooldown started)
+    // Only show attack bar if has attacked
     const maxCooldown = 1 / Config.ENEMY.ATTACK_SPEED;
     const hasAttacked = this.attackCooldown > 0 || this.attackCooldown < maxCooldown * 0.95;
 
@@ -162,7 +229,6 @@ export class Enemy {
       yOffset -= attackBarHeight + 1;
       const cooldownPercent = 1 - (this.attackCooldown / maxCooldown);
 
-      // Attack bar background
       ctx.fillStyle = '#222';
       ctx.fillRect(
         this.x - barWidth / 2,
@@ -171,7 +237,6 @@ export class Enemy {
         attackBarHeight
       );
 
-      // Attack bar foreground (yellow when filling, orange when full)
       ctx.fillStyle = cooldownPercent >= 1 ? '#ff8800' : '#ffff00';
       ctx.fillRect(
         this.x - barWidth / 2,
@@ -179,6 +244,22 @@ export class Enemy {
         barWidth * cooldownPercent,
         attackBarHeight
       );
+    }
+
+    // Root indicator
+    if (this.rootTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#d4a574';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(
+        this.x - this.size / 2 - 2,
+        this.y - this.size / 2 - 2,
+        this.size + 4,
+        this.size + 4
+      );
+      ctx.restore();
     }
   }
 }

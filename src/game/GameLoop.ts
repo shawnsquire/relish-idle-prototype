@@ -25,10 +25,10 @@ export class GameLoop {
     this.hudElement = document.getElementById('hud')!;
     this.summonBarElement = document.getElementById('summonBar')!;
 
-    // Initialize town phase
-    this.townPhase = new TownPhase(this.gameState, () => this.startCombat());
+    // Hide the summon bar permanently — cooldown is now shown via trail unwind
+    this.summonBarElement.classList.add('hidden');
 
-    // Start with combat
+    this.townPhase = new TownPhase(this.gameState, () => this.startCombat());
     this.startCombat();
   }
 
@@ -47,7 +47,6 @@ export class GameLoop {
 
   handleGameOver() {
     this.gameOverActive = true;
-    // Setup restart click handler
     this.restartClickHandler = () => this.restart();
     this.canvas.addEventListener('click', this.restartClickHandler);
   }
@@ -58,11 +57,8 @@ export class GameLoop {
       this.restartClickHandler = null;
     }
 
-    // Reset game state
     this.gameState = new GameState();
     this.townPhase = new TownPhase(this.gameState, () => this.startCombat());
-
-    // Start new combat
     this.startCombat();
   }
 
@@ -79,13 +75,12 @@ export class GameLoop {
 
   loop = () => {
     const currentTime = performance.now();
-    const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
+    const deltaTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
     this.update(deltaTime);
     this.draw();
     this.updateHUD();
-    this.updateSummonBar();
 
     this.animationId = requestAnimationFrame(this.loop);
   };
@@ -95,7 +90,6 @@ export class GameLoop {
       this.combatPhase.update(deltaTime);
     }
 
-    // Check if combat ended
     if (this.gameState.phase === 'town') {
         this.townPhase.show();
     }
@@ -124,52 +118,11 @@ export class GameLoop {
         </div>
         <div class="hud-stat">
           <div class="hud-stat-label">Minions</div>
-          <div class="hud-stat-value">${minions}/${this.gameState.availableMinions}</div>
+          <div class="hud-stat-value">${minions}</div>
         </div>
       `;
     } else {
       this.hudElement.innerHTML = '';
-    }
-  }
-
-  updateSummonBar() {
-    if (this.gameState.phase === 'combat' && this.combatPhase && !this.gameOverActive) {
-      this.summonBarElement.classList.remove('hidden');
-
-      const player = this.combatPhase.player;
-      const castProgress = player.getCastProgress();
-      const cooldownPercent = 1 - (player.summonCooldown / player.maxSummonCooldown);
-
-      // Update class for styling
-      if (player.isCasting) {
-        this.summonBarElement.className = 'casting';
-      } else if (player.canStartCast()) {
-        this.summonBarElement.className = 'ready';
-      } else {
-        this.summonBarElement.className = '';
-      }
-
-      // Update content
-      if (player.isCasting) {
-        const heightPercent = castProgress * 100;
-        this.summonBarElement.innerHTML = `
-          <div class="summon-fill" style="height: ${heightPercent}%"></div>
-          <div class="summon-label">CASTING<br>${Math.floor(castProgress * 100)}%</div>
-        `;
-      } else if (player.summonCooldown > 0) {
-        const heightPercent = cooldownPercent * 100;
-        this.summonBarElement.innerHTML = `
-          <div class="summon-cooldown" style="height: ${heightPercent}%"></div>
-          <div class="summon-label">COOLDOWN</div>
-        `;
-      } else {
-        this.summonBarElement.innerHTML = `
-          <div class="summon-cooldown" style="height: 100%"></div>
-          <div class="summon-label">READY!</div>
-        `;
-      }
-    } else {
-      this.summonBarElement.classList.add('hidden');
     }
   }
 }
