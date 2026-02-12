@@ -138,6 +138,7 @@ export class CombatPhase {
   }
 
   private beginGesture(x: number, y: number) {
+    this.spellRenderer.onGestureStart();
     this.gestureTracker.setCanvasSize(this.canvas.width, this.canvas.height);
     this.gestureTracker.startGesture(x, y);
     this.prevRuneCount = 0;

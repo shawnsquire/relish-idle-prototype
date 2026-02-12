@@ -1,6 +1,7 @@
 import { RUNES, RUNE_IDS, RUNE_HIT_RADIUS, type RuneId } from './Runes';
 import type { GestureTracker, PathPoint } from './GestureTracker';
 import type { ArchetypeDefinition } from './Archetypes';
+import { lookupArchetype } from './Archetypes';
 import { Config } from '../Config';
 
 interface RuneFlash {
@@ -13,6 +14,19 @@ interface CastMessage {
   description: string;
   color: string;
   timer: number;
+  runeCount: number;
+  descriptionVisible: boolean;
+  nameVisible: boolean;
+}
+
+interface PromotedName {
+  name: string;
+  color: string;
+  timer: number;
+  totalTime: number;
+  yOffset: number;
+  fontSize: number;
+  settled: boolean;
 }
 
 interface UnwindTrail {
@@ -23,9 +37,16 @@ interface UnwindTrail {
   duration: number;
 }
 
+const SHRINK_SLIDE_DURATION = 0.2;
+const PROMOTED_Y = 0.87;
+const PROMOTED_FONT_SIZE = 14;
+const CAST_NAME_FONT_SIZE = 28;
+const CAST_NAME_Y = 0.91;
+
 export class SpellRenderer {
   private runeFlashes: RuneFlash[] = [];
   private castMessage: CastMessage | null = null;
+  private promotedName: PromotedName | null = null;
   private fizzleTimer = 0;
   private pulseTime = 0;
 
@@ -53,6 +74,27 @@ export class SpellRenderer {
       }
     }
 
+    // Update promoted name
+    if (this.promotedName) {
+      this.promotedName.timer -= deltaTime;
+
+      if (!this.promotedName.settled) {
+        const lerpSpeed = deltaTime / SHRINK_SLIDE_DURATION;
+        this.promotedName.yOffset += (PROMOTED_Y - this.promotedName.yOffset) * Math.min(1, lerpSpeed);
+        this.promotedName.fontSize += (PROMOTED_FONT_SIZE - this.promotedName.fontSize) * Math.min(1, lerpSpeed);
+
+        if (Math.abs(this.promotedName.yOffset - PROMOTED_Y) < 0.001 && Math.abs(this.promotedName.fontSize - PROMOTED_FONT_SIZE) < 0.5) {
+          this.promotedName.yOffset = PROMOTED_Y;
+          this.promotedName.fontSize = PROMOTED_FONT_SIZE;
+          this.promotedName.settled = true;
+        }
+      }
+
+      if (this.promotedName.timer <= 0) {
+        this.promotedName = null;
+      }
+    }
+
     // Update fizzle
     if (this.fizzleTimer > 0) {
       this.fizzleTimer -= deltaTime;
@@ -67,8 +109,28 @@ export class SpellRenderer {
     }
   }
 
+  onGestureStart() {
+    if (this.castMessage) {
+      this.castMessage.descriptionVisible = false;
+    }
+  }
+
   onRuneHit(runeId: RuneId) {
     this.runeFlashes.push({ runeId, timer: 0.5 });
+
+    // Promote cast name to row 3 on first rune hit of a new gesture
+    if (this.castMessage && this.castMessage.nameVisible) {
+      this.promotedName = {
+        name: this.castMessage.name,
+        color: this.castMessage.color,
+        timer: this.castMessage.timer,
+        totalTime: Config.SPELL.INCANTATION_DISPLAY_TIME,
+        yOffset: CAST_NAME_Y,
+        fontSize: CAST_NAME_FONT_SIZE,
+        settled: false,
+      };
+      this.castMessage.nameVisible = false;
+    }
   }
 
   onSpellCast(archetype: ArchetypeDefinition, path: PathPoint[], lastRuneColor: string) {
@@ -77,6 +139,9 @@ export class SpellRenderer {
       description: archetype.description,
       color: archetype.color,
       timer: Config.SPELL.INCANTATION_DISPLAY_TIME,
+      runeCount: archetype.runeSequence.length,
+      descriptionVisible: true,
+      nameVisible: true,
     };
 
     // Start unwind: burn the trail backwards over the cooldown duration
@@ -106,9 +171,8 @@ export class SpellRenderer {
       this.drawUnwindTrail(ctx);
     }
 
-    // Incantation text: show during active gesture OR briefly after cast
+    this.drawPromotedName(ctx, canvasWidth, canvasHeight);
     this.drawIncantation(ctx, tracker, canvasWidth, canvasHeight);
-
     this.drawCastMessage(ctx, canvasWidth, canvasHeight);
     this.drawFizzle(ctx, canvasWidth, canvasHeight);
   }
@@ -235,42 +299,69 @@ export class SpellRenderer {
     ctx.restore();
   }
 
+  private drawPromotedName(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
+    if (!this.promotedName) return;
+
+    const pn = this.promotedName;
+    const alpha = Math.min(1, pn.timer / 0.5) * 0.7;
+    const y = pn.yOffset * canvasHeight;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = pn.color;
+    ctx.font = `bold ${Math.round(pn.fontSize)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(pn.name, canvasWidth / 2, y);
+    ctx.restore();
+  }
+
   private drawIncantation(ctx: CanvasRenderingContext2D, tracker: GestureTracker, canvasWidth: number, canvasHeight: number) {
     const seq = tracker.isActive ? tracker.currentSequence : null;
+    if (!seq || seq.length === 0) return;
 
-    // During active gesture: build up rune names
-    if (seq && seq.length > 0) {
-      const parts = seq.map(id => RUNES[id].name);
-      const text = parts.join('  \u25C7  '); // diamond separator
-      const y = canvasHeight * 0.92;
+    const archetype = seq.length >= Config.SPELL.MIN_RUNES ? lookupArchetype(seq) : undefined;
+    const cx = canvasWidth / 2;
 
-      ctx.save();
-      ctx.font = 'bold 16px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-      // Backdrop pill
-      const metrics = ctx.measureText(text);
-      const pw = metrics.width + 24;
-      const ph = 24;
+    // Backdrop pill spanning preview zone
+    const pillTop = canvasHeight * 0.88;
+    const pillBottom = canvasHeight * 0.97;
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.roundRect(cx - 140, pillTop, 280, pillBottom - pillTop, 8);
+    ctx.fill();
+
+    if (archetype) {
+      // 1. Spell name preview — Y=0.91, muted grey
       ctx.globalAlpha = 0.5;
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.roundRect(canvasWidth / 2 - pw / 2, y - ph / 2, pw, ph, 6);
-      ctx.fill();
-
-      // Text
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = '#ddd';
-      ctx.fillText(text, canvasWidth / 2, y);
-      ctx.restore();
+      ctx.fillStyle = '#666';
+      ctx.font = 'bold 22px serif';
+      ctx.fillText(archetype.name, cx, canvasHeight * 0.91);
     }
+
+    // 2. Rune pills — colored text at Y=0.95 (description slot)
+    const runeY = canvasHeight * 0.95;
+    const parts = seq.map(id => RUNES[id].name);
+    const pillText = parts.join('  \u25C7  ');
+    ctx.font = 'bold 14px monospace';
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#ddd';
+    ctx.fillText(pillText, cx, runeY);
+
+    ctx.restore();
   }
 
   private drawCastMessage(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
     if (!this.castMessage) return;
 
-    const { name, description, color, timer } = this.castMessage;
+    const { name, description, color, timer, runeCount, descriptionVisible, nameVisible } = this.castMessage;
+    if (!nameVisible && !descriptionVisible) return;
+
     const totalTime = Config.SPELL.INCANTATION_DISPLAY_TIME;
     let alpha = 1;
     const elapsed = totalTime - timer;
@@ -280,39 +371,83 @@ export class SpellRenderer {
       alpha = timer / 0.5;
     }
 
-    const nameY = canvasHeight * 0.91;
+    const nameY = canvasHeight * CAST_NAME_Y;
     const descY = canvasHeight * 0.95;
+    const cx = canvasWidth / 2;
 
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Measure both lines for backdrop
-    ctx.font = 'bold 28px serif';
-    const nameWidth = ctx.measureText(name).width;
-    ctx.font = 'italic 16px serif';
-    const descWidth = ctx.measureText(description).width;
-    const pillWidth = Math.max(nameWidth, descWidth) + 24;
-    const pillTop = nameY - 18;
-    const pillBottom = descY + 12;
+    // Measure visible content for backdrop pill
+    let pillWidth = 24;
+    if (nameVisible) {
+      ctx.font = `bold ${CAST_NAME_FONT_SIZE}px serif`;
+      pillWidth = Math.max(pillWidth, ctx.measureText(name).width + 24);
+    }
+    if (descriptionVisible) {
+      ctx.font = 'italic 16px serif';
+      pillWidth = Math.max(pillWidth, ctx.measureText(description).width + 24);
+    }
 
-    // Backdrop pill
-    ctx.globalAlpha = alpha * 0.5;
+    const pillTop = nameVisible ? nameY - 18 : descY - 12;
+    const pillBottom = descriptionVisible ? descY + 12 : nameY + 18;
+
+    // Backdrop pill — continuous coverage, no gap after incantation
+    const backdropAlpha = elapsed < 0.3
+      ? 0.3 + (0.2 * (elapsed / 0.3))   // 0.3 → 0.5 over 0.3s
+      : timer < 0.5
+        ? timer / 0.5 * 0.5              // fade out with text
+        : 0.5;                            // steady state
+    ctx.globalAlpha = backdropAlpha;
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.roundRect(canvasWidth / 2 - pillWidth / 2, pillTop, pillWidth, pillBottom - pillTop, 6);
+    ctx.roundRect(cx - pillWidth / 2, pillTop, pillWidth, pillBottom - pillTop, 6);
     ctx.fill();
 
-    // Name
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = color;
-    ctx.font = 'bold 28px serif';
-    ctx.fillText(name, canvasWidth / 2, nameY);
+    // Color bloom in backdrop pill during first ~0.3s
+    if (nameVisible && elapsed < 0.3) {
+      const bloomAlpha = 0.15 * (1 - elapsed / 0.3);
+      ctx.globalAlpha = bloomAlpha * backdropAlpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(cx - pillWidth / 2, pillTop, pillWidth, pillBottom - pillTop, 6);
+      ctx.fill();
+    }
 
-    // Description
-    ctx.fillStyle = '#ccc';
-    ctx.font = 'italic 16px serif';
-    ctx.fillText(description, canvasWidth / 2, descY);
+    // Draw name in row 2
+    if (nameVisible) {
+      // Expand-settle on spell name
+      const expandDuration = runeCount <= 2 ? 0.15 : runeCount === 3 ? 0.3 : 0.5;
+      let scale = 1.0;
+      if (elapsed < expandDuration) {
+        const t = elapsed / expandDuration;
+        const eased = 1 - (1 - t) * (1 - t);
+        scale = 1.2 - 0.2 * eased;
+      }
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.font = `bold ${CAST_NAME_FONT_SIZE}px serif`;
+
+      if (scale !== 1.0) {
+        ctx.save();
+        ctx.translate(cx, nameY);
+        ctx.scale(scale, scale);
+        ctx.fillText(name, 0, 0);
+        ctx.restore();
+      } else {
+        ctx.fillText(name, cx, nameY);
+      }
+    }
+
+    // Draw description in row 1
+    if (descriptionVisible) {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#ccc';
+      ctx.font = 'italic 16px serif';
+      ctx.fillText(description, cx, descY);
+    }
 
     ctx.restore();
   }
