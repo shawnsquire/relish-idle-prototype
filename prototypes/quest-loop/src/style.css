@@ -1,0 +1,306 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0C0C0E;
+  color: #ddd;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+h2 { margin-bottom: 8px; }
+
+button {
+  padding: 4px 12px;
+  margin: 2px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  background: #2a2a2e;
+  color: #ddd;
+  border: 1px solid #555;
+}
+
+button:hover:not(:disabled) { background: #3a3a3e; border-color: #888; }
+button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ---- Debug (collection screen inline) ---- */
+.debug-panel {
+  border: 1px solid #555;
+  padding: 6px 8px;
+  background: #111;
+  font-size: 11px;
+}
+.debug-panel label { display: block; margin: 3px 0; }
+
+/* ---- Debug (quest screen floating) ---- */
+.debug-float {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+  font-size: 11px;
+}
+
+.debug-toggle-btn {
+  background: #333;
+  color: #FFD000;
+  border: 1px solid #FFD000;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.debug-toggle-btn:hover { background: #444; }
+
+.debug-body {
+  background: #111;
+  border: 1px solid #555;
+  padding: 8px;
+  margin-top: 4px;
+  max-width: 260px;
+}
+.debug-body.collapsed { display: none; }
+.debug-body label { display: block; margin: 4px 0; }
+.debug-body input[type="range"] { width: 100px; vertical-align: middle; }
+.debug-body span { margin-left: 4px; color: #FFD000; }
+.debug-body button { display: block; margin: 4px 0; width: 100%; }
+
+/* ============================================================
+   COLLECTION SCREEN
+   ============================================================ */
+#screen-collection { padding: 12px; }
+
+.collection-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.undead-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 10px;
+  background: #1a1a1e;
+  border: 2px solid #444;
+  color: #ddd;
+  cursor: pointer;
+  min-width: 120px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.undead-btn:hover:not(:disabled) { border-color: #888; background: #222; }
+.undead-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.undead-btn.in-jar { border-color: #FFD000; background: #1a1a0a; }
+
+.ub-name { font-weight: bold; font-size: 13px; }
+.ub-type { color: #999; font-size: 11px; }
+.ub-power { color: #8f8; font-size: 11px; }
+.ub-jar { color: #FFD000; font-weight: bold; font-size: 10px; }
+
+/* ============================================================
+   QUEST SCREEN — fixed layout, nothing pushes down
+   ============================================================ */
+.quest-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.quest-top {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-height: 0; /* allows flex children to shrink */
+}
+
+.quest-col-left {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.quest-col-right {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* Status bar */
+.quest-status {
+  background: #1a1a1e;
+  border: 1px solid #444;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.enemy-hp-bar {
+  position: relative;
+  height: 14px;
+  background: #222;
+  border: 1px solid #555;
+  margin-top: 4px;
+}
+.enemy-hp-fill {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  background: #c44040;
+  transition: width 0.2s;
+}
+.enemy-hp-text {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  line-height: 14px;
+  padding-left: 4px;
+}
+
+.upcoming {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* Army list */
+.quest-army {
+  background: #0a1a0a;
+  border: 1px solid #2a5a2a;
+  padding: 6px 8px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.army-header {
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #8f8;
+}
+
+.army-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.army-unit {
+  background: #1a2a1a;
+  border: 1px solid #3a5a3a;
+  padding: 2px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.army-unit small { color: #6a8; }
+
+/* Body counter */
+.body-counter {
+  font-size: 14px;
+  font-weight: bold;
+  padding: 8px;
+  background: #1a0a2e;
+  border: 2px solid #6a3d9a;
+  color: #d4a5ff;
+}
+
+/* Log — fixed height, scrolls */
+.quest-log {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #333;
+  padding: 6px;
+  background: #08080a;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.quest-log div { margin-bottom: 2px; }
+.quest-log .log-wave { color: #FFD000; font-weight: bold; }
+.quest-log .log-boss { color: #ff4444; font-weight: bold; font-size: 13px; }
+.quest-log .log-kill { color: #6a6; }
+.quest-log .log-death { color: #c44; }
+.quest-log .log-cast { color: #88f; font-weight: bold; }
+
+/* Spells — grid of cards */
+.quest-spells {
+  flex: 0 0 auto;
+  padding-top: 6px;
+}
+
+.spell-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.spell-card {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 8px;
+  min-width: 100px;
+  border: 2px solid #333;
+  background: #1a1a1e;
+  font-family: inherit;
+  font-size: 11px;
+  color: #ddd;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spell-card.available {
+  border-color: #4a4;
+  background: #0a1a0a;
+}
+.spell-card.available:hover { background: #0f2a0f; border-color: #6c6; }
+
+.spell-card.strong {
+  border-color: #FFD000;
+  background: #1a1a0a;
+  box-shadow: 0 0 8px rgba(255, 208, 0, 0.25);
+}
+.spell-card.strong:hover { background: #2a2a0a; }
+
+.spell-card.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #333;
+}
+
+.sc-name { font-weight: bold; font-size: 12px; }
+.sc-cost { color: #aaa; }
+.sc-tags { margin-top: 2px; }
+.sc-tag { font-size: 10px; margin-right: 4px; }
+.sc-strong { color: #4f4; font-weight: bold; font-size: 10px; margin-top: 2px; }
+
+/* Controls */
+.quest-controls {
+  padding: 6px 0;
+}
+
+/* Last chance */
+.last-chance {
+  border: 3px solid #ff4444;
+  background: #1a0a0a;
+  padding: 10px;
+}
+.last-chance h3 { color: #ff4444; margin-bottom: 6px; }
+.last-chance p { margin-bottom: 6px; font-size: 12px; }
+
+/* ============================================================
+   LOOT SCREEN
+   ============================================================ */
+#screen-loot { padding: 12px; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 600px) {
+  .quest-top { flex-direction: column; }
+  .quest-col-left { flex: 0 0 auto; }
+  .quest-log { max-height: 200px; }
+}

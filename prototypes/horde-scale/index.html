@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Horde Scale — Relish Prototype</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="canvas-container"></div>
+
+    <div id="controls">
+      <h2>Horde Scale</h2>
+
+      <div class="control-group">
+        <label>Unit Presets</label>
+        <div class="preset-row">
+          <button class="preset-btn" data-count="10">10</button>
+          <button class="preset-btn" data-count="100">100</button>
+          <button class="preset-btn active" data-count="1000">1K</button>
+          <button class="preset-btn" data-count="10000">10K</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="zoom-slider">Zoom: <span id="zoom-value">1.0</span>x</label>
+        <input type="range" id="zoom-slider" min="0.05" max="3" step="0.05" value="1" />
+      </div>
+
+      <div class="control-group">
+        <label for="spawn-slider">Spawn Rate: <span id="spawn-value">1.0</span>x</label>
+        <input type="range" id="spawn-slider" min="0.1" max="5" step="0.1" value="1" />
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="auto-zoom" checked /> Auto-zoom
+        </label>
+      </div>
+
+      <div class="stats">
+        <div>Player: <span id="stat-player">0</span></div>
+        <div>Enemies: <span id="stat-enemies">0</span></div>
+        <div>FPS: <span id="stat-fps">0</span></div>
+        <div>Zoom: <span id="stat-zoom">1.0</span>x</div>
+      </div>
+
+      <button id="reset-btn">Reset</button>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
