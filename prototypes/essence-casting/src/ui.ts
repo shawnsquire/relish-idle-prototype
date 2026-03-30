@@ -24,7 +24,7 @@ export function updateHUD(essences: EssenceSystem, battlefield: Battlefield, dt:
     ` | <span style="color:${RUNES.veil.color}">Veil: ${c.veil}</span>` +
     ` | <span style="color:${RUNES.chain.color}">Chain: ${c.chain}</span>`;
 
-  armyEl.textContent = `Undead: ${battlefield.undead.count}`;
+  armyEl.textContent = `Undead: ${battlefield.getUndeadCount()}`;
 
   const secs = Math.floor(battlefield.elapsed);
   const m = Math.floor(secs / 60);

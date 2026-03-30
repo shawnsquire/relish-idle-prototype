@@ -23,11 +23,13 @@ async function main() {
   const essenceGfx = new Graphics();
   const undeadGfx = new Graphics();
   const enemyGfx = new Graphics();
+  const fxGfx = new Graphics();
   const runeGfx = new Graphics();
   const trailGfx = new Graphics();
 
   app.stage.addChild(essenceGfx);
   app.stage.addChild(enemyGfx);
+  app.stage.addChild(fxGfx);
   app.stage.addChild(undeadGfx);
   app.stage.addChild(runeGfx);
   app.stage.addChild(trailGfx);
@@ -75,7 +77,7 @@ async function main() {
   // ─── Systems ────────────────────────────────────────────────────────
   const essences = new EssenceSystem();
   const battlefield = new Battlefield(
-    undeadGfx, enemyGfx,
+    undeadGfx, enemyGfx, fxGfx,
     app.screen.width, app.screen.height,
   );
   battlefield.essences = essences;
@@ -156,8 +158,8 @@ async function main() {
           }
         }
 
-        // Spawn undead — always 1 per cast
-        battlefield.spawnUndead(1);
+        // Spawn undead from archetype
+        battlefield.spawnUndeadFromArchetype(archetype);
 
         // Show cast message
         showCastMessage(archetype.name, archetype.color);
