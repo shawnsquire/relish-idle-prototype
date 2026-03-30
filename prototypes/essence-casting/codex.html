@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relish — Creature Codex</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0C0C0E;
+    color: #ccc;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    color: #e0d8c8;
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 0.8rem;
+    margin-bottom: 20px;
+  }
+  .filters {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: #1a1a1e;
+    color: #888;
+    border: 1px solid #333;
+    padding: 6px 16px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: #555; color: #bbb; }
+  .filter-btn.active { background: #2a2a30; color: #e0d8c8; border-color: #666; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #141418;
+    border-radius: 6px;
+    border-top: 3px solid #555;
+    padding: 14px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  }
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .card-top svg { flex-shrink: 0; }
+  .creature-name {
+    font-weight: bold;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+  .creature-desc {
+    color: #777;
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
+  .rune-seq {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    font-size: 0.65rem;
+  }
+  .rune-pill {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+    font-size: 0.6rem;
+    color: #000;
+  }
+  .rune-arrow { color: #555; font-size: 0.6rem; }
+  .stats-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+    font-size: 0.65rem;
+  }
+  .stat {
+    text-align: center;
+    padding: 3px 0;
+    border-radius: 3px;
+    background: #1a1a1e;
+  }
+  .stat-label { color: #666; font-size: 0.55rem; display: block; }
+  .stat-value { font-weight: bold; }
+  .stat-green .stat-value { color: #5cb85c; }
+  .stat-white .stat-value { color: #ccc; }
+  .stat-red .stat-value { color: #d9534f; }
+  .stat-grey .stat-value { color: #555; }
+  .behaviors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .behavior-pill {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.55rem;
+    line-height: 1.3;
+    color: #fff;
+    opacity: 0.9;
+  }
+  .bhv-defensive { background: #2a4a7a; }
+  .bhv-offensive { background: #7a2a2a; }
+  .bhv-utility { background: #7a5a2a; }
+  .bhv-support { background: #2a6a3a; }
+  .bhv-special { background: #5a2a6a; }
+</style>
+</head>
+<body>
+
+<h1>Relish — Creature Codex</h1>
+<div class="subtitle" id="count"></div>
+<div class="filters">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="2">2-Rune</button>
+  <button class="filter-btn" data-filter="3">3-Rune</button>
+  <button class="filter-btn" data-filter="4">4-Rune</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script type="module" src="/src/codex.ts"></script>
+<!--
+const RUNE_COLORS = {
+  breath: '#7fdbca',
+  flesh: '#c97b84',
+  chain: '#d4a574',
+  veil: '#9b8ec4',
+};
+const RUNE_NAMES = { breath: 'BREATH', flesh: 'FLESH', chain: 'CHAIN', veil: 'VEIL' };
+// Diamond: breath=top, flesh=bottom, veil=left, chain=right
+const RUNE_POS = {
+  breath: { cx: 40, cy: 10 },
+  flesh:  { cx: 40, cy: 70 },
+  veil:   { cx: 10, cy: 40 },
+  chain:  { cx: 70, cy: 40 },
+};
+
+const ARCHETYPES = [
+  // 2-RUNE (12)
+  { id:'revenant', name:'Revenant', description:'Raised warrior burning with fading life.', runeSequence:['breath','flesh'], color:'#b85c3a', stats:{health:1.0,damage:1.0,speed:1.0,size:1.0}, behaviors:[{type:'rage',maxAttackSpeedBonus:1.5}] },
+  { id:'soul_shackle', name:'Soul Shackle', description:'Spectral chains that leash life from the living.', runeSequence:['breath','chain'], color:'#5a9e8f', stats:{health:0.7,damage:0.6,speed:0.8,size:0.8}, behaviors:[{type:'life_tether',dps:3}] },
+  { id:'whisper', name:'Whisper', description:'A murmur of death that saps the will to fight.', runeSequence:['breath','veil'], color:'#6b7fa3', stats:{health:0.5,damage:0.3,speed:1.3,size:0.6}, behaviors:[{type:'aura_enemy_debuff',radius:60,attackSpeedReduction:0.4}] },
+  { id:'ghoul', name:'Ghoul', description:'Ravenous corpse that feeds on the fallen.', runeSequence:['flesh','breath'], color:'#6b8a3a', stats:{health:1.2,damage:1.3,speed:1.1,size:1.1}, behaviors:[{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5}] },
+  { id:'bone_construct', name:'Bone Construct', description:'Dense skeleton bound in rigid formation.', runeSequence:['flesh','chain'], color:'#d4c9a8', stats:{health:2.0,damage:0.5,speed:0.5,size:1.5}, behaviors:[{type:'fortified',damageReduction:0.5}] },
+  { id:'lurker', name:'Lurker', description:'Dead flesh cloaked in shadow. Strikes unseen.', runeSequence:['flesh','veil'], color:'#3a3a5c', stats:{health:0.6,damage:1.5,speed:1.4,size:0.8}, behaviors:[{type:'ambush',damageMultiplier:3}] },
+  { id:'life_leech', name:'Life Leech', description:'Parasitic tether that feeds all nearby dead.', runeSequence:['chain','breath'], color:'#8a5c5c', stats:{health:0.8,damage:0.7,speed:0.7,size:0.8}, behaviors:[{type:'life_steal',percent:0.3},{type:'aura_ally_buff',radius:50,damageBuff:0.1}] },
+  { id:'bone_wall', name:'Bone Wall', description:'Immovable rampart of fused bone.', runeSequence:['chain','flesh'], color:'#c9b896', stats:{health:3.0,damage:0.0,speed:0.0,size:2.0}, behaviors:[{type:'stationary'},{type:'taunt',radius:80}] },
+  { id:'shadow_snare', name:'Shadow Snare', description:'Invisible chains that slow all who pass.', runeSequence:['chain','veil'], color:'#5c4a6b', stats:{health:0.6,damage:0.0,speed:0.9,size:0.7}, behaviors:[{type:'aoe_slow',radius:70,percent:0.4}] },
+  { id:'shade', name:'Shade', description:'Swift ghost that phases through the battlefield.', runeSequence:['veil','breath'], color:'#4a6b8a', stats:{health:0.5,damage:0.8,speed:1.6,size:0.7}, behaviors:[{type:'teleport_attack'},{type:'phase'}] },
+  { id:'doppelganger', name:'Doppelganger', description:'Mimicking form that confuses the living.', runeSequence:['veil','flesh'], color:'#7a6b8a', stats:{health:0.8,damage:0.8,speed:1.0,size:1.0}, behaviors:[{type:'decoy_on_hit',decoyHP:10}] },
+  { id:'soul_anchor', name:'Soul Anchor', description:'Spirit that pins the living in place.', runeSequence:['veil','chain'], color:'#6b5c8a', stats:{health:0.7,damage:0.6,speed:0.8,size:0.8}, behaviors:[{type:'root_on_hit',duration:2}] },
+  // 3-RUNE (24)
+  { id:'iron_revenant', name:'Iron Revenant', description:'Armored warrior that fights harder as it falls.', runeSequence:['breath','flesh','chain'], color:'#8a6b4a', stats:{health:1.5,damage:1.0,speed:0.8,size:1.3}, behaviors:[{type:'rage',maxAttackSpeedBonus:1.5},{type:'fortified',damageReduction:0.3}] },
+  { id:'fading_revenant', name:'Fading Revenant', description:'Phase-shifts between worlds mid-swing.', runeSequence:['breath','flesh','veil'], color:'#7a5c6b', stats:{health:0.8,damage:1.0,speed:1.1,size:1.0}, behaviors:[{type:'rage',maxAttackSpeedBonus:1.5},{type:'dodge',chance:0.35}] },
+  { id:'sinew_shackle', name:'Sinew Shackle', description:'Corporeal chains made of twisted muscle.', runeSequence:['breath','chain','flesh'], color:'#7a8a6b', stats:{health:1.2,damage:0.6,speed:0.6,size:1.1}, behaviors:[{type:'life_tether',dps:3},{type:'fortified',damageReduction:0.25}] },
+  { id:'spectral_leash', name:'Spectral Leash', description:'Invisible tether draining from the unseen.', runeSequence:['breath','chain','veil'], color:'#5a7a8a', stats:{health:0.6,damage:0.7,speed:1.0,size:0.7}, behaviors:[{type:'life_tether',dps:3},{type:'phase'}] },
+  { id:'manifest_whisper', name:'Manifest Whisper', description:'Whisper given weight and form to block the path.', runeSequence:['breath','veil','flesh'], color:'#6b7a5c', stats:{health:0.9,damage:0.4,speed:0.8,size:1.2}, behaviors:[{type:'aura_enemy_debuff',radius:60,attackSpeedReduction:0.4},{type:'taunt',radius:70}] },
+  { id:'binding_whisper', name:'Binding Whisper', description:'Murmur that roots those who hear it.', runeSequence:['breath','veil','chain'], color:'#5c6b8a', stats:{health:0.5,damage:0.3,speed:1.0,size:0.7}, behaviors:[{type:'aura_enemy_debuff',radius:60,attackSpeedReduction:0.4},{type:'root_on_hit',duration:1.5}] },
+  { id:'chained_ghoul', name:'Chained Ghoul', description:'Bound feeder that drags its prey to a halt.', runeSequence:['flesh','breath','chain'], color:'#6b7a4a', stats:{health:1.3,damage:1.2,speed:0.9,size:1.2}, behaviors:[{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5},{type:'slow_on_hit',percent:0.3,duration:2}] },
+  { id:'phantom_ghoul', name:'Phantom Ghoul', description:'Ghoul that feeds from between worlds.', runeSequence:['flesh','breath','veil'], color:'#5c6b5c', stats:{health:1.0,damage:1.3,speed:1.3,size:1.0}, behaviors:[{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5},{type:'phase'}] },
+  { id:'draining_construct', name:'Draining Construct', description:'Bone fortress that drinks from attackers.', runeSequence:['flesh','chain','breath'], color:'#b8a87a', stats:{health:2.2,damage:0.3,speed:0.4,size:1.6}, behaviors:[{type:'fortified',damageReduction:0.5},{type:'life_steal',percent:0.4}] },
+  { id:'phantom_construct', name:'Phantom Construct', description:'Bone wall that flickers in and out of existence.', runeSequence:['flesh','chain','veil'], color:'#a89a8a', stats:{health:1.8,damage:0.5,speed:0.4,size:1.5}, behaviors:[{type:'fortified',damageReduction:0.4},{type:'dodge',chance:0.3}] },
+  { id:'vampiric_lurker', name:'Vampiric Lurker', description:'Shadow hunter that drinks deeply from wounds.', runeSequence:['flesh','veil','breath'], color:'#4a3a4a', stats:{health:0.7,damage:1.3,speed:1.3,size:0.9}, behaviors:[{type:'ambush',damageMultiplier:3},{type:'life_steal',percent:0.35}] },
+  { id:'snaring_lurker', name:'Snaring Lurker', description:'Shadow predator that pins prey before the kill.', runeSequence:['flesh','veil','chain'], color:'#3a3a4a', stats:{health:0.6,damage:1.4,speed:1.2,size:0.8}, behaviors:[{type:'ambush',damageMultiplier:3},{type:'root_on_hit',duration:1.5}] },
+  { id:'flesh_leech', name:'Flesh Leech', description:'Heavy parasitic mound that saps life from all it touches.', runeSequence:['chain','breath','flesh'], color:'#8a5a5a', stats:{health:1.5,damage:0.6,speed:0.5,size:1.3}, behaviors:[{type:'life_steal',percent:0.3},{type:'aura_ally_buff',radius:50,damageBuff:0.1},{type:'fortified',damageReduction:0.2}] },
+  { id:'phantom_leech', name:'Phantom Leech', description:'Invisible siphon drifting unseen among enemies.', runeSequence:['chain','breath','veil'], color:'#5a6b7a', stats:{health:0.6,damage:0.5,speed:1.0,size:0.7}, behaviors:[{type:'life_steal',percent:0.3},{type:'aura_ally_buff',radius:50,damageBuff:0.1},{type:'phase'}] },
+  { id:'living_wall', name:'Living Wall', description:'Self-mending barricade of bone and sinew.', runeSequence:['chain','flesh','breath'], color:'#c9b8a0', stats:{health:3.0,damage:0.0,speed:0.0,size:2.0}, behaviors:[{type:'stationary'},{type:'taunt',radius:80},{type:'regen',hpPerSecond:5}] },
+  { id:'flickering_wall', name:'Flickering Wall', description:'Barrier that phases, letting allies through.', runeSequence:['chain','flesh','veil'], color:'#a0a0b8', stats:{health:2.5,damage:0.0,speed:0.0,size:1.8}, behaviors:[{type:'stationary'},{type:'taunt',radius:80},{type:'dodge',chance:0.25}] },
+  { id:'draining_snare', name:'Draining Snare', description:'Dark zone that weakens and drains trespassers.', runeSequence:['chain','veil','breath'], color:'#5c4a5c', stats:{health:0.7,damage:0.0,speed:0.8,size:0.8}, behaviors:[{type:'aoe_slow',radius:70,percent:0.4},{type:'damage_aura',radius:70,dps:2}] },
+  { id:'thorned_snare', name:'Thorned Snare', description:'Physical trap of bone spikes. Massive, immovable.', runeSequence:['chain','veil','flesh'], color:'#7a6b5c', stats:{health:1.5,damage:0.0,speed:0.6,size:1.4}, behaviors:[{type:'aoe_slow',radius:70,percent:0.4},{type:'fortified',damageReduction:0.4},{type:'damage_aura',radius:70,dps:2}] },
+  { id:'risen_shade', name:'Risen Shade', description:'Ghost given flesh, harder to banish.', runeSequence:['veil','breath','flesh'], color:'#5a7a6b', stats:{health:1.0,damage:0.9,speed:1.4,size:1.0}, behaviors:[{type:'teleport_attack'},{type:'phase'},{type:'fortified',damageReduction:0.2}] },
+  { id:'binding_shade', name:'Binding Shade', description:'Ghost that pins targets after teleporting in.', runeSequence:['veil','breath','chain'], color:'#4a5c7a', stats:{health:0.6,damage:0.8,speed:1.5,size:0.8}, behaviors:[{type:'teleport_attack'},{type:'root_on_hit',duration:1.5}] },
+  { id:'hungry_double', name:'Hungry Double', description:'Doppelganger that devours what it copies.', runeSequence:['veil','flesh','breath'], color:'#6b5c6b', stats:{health:1.0,damage:1.0,speed:1.1,size:1.0}, behaviors:[{type:'decoy_on_hit',decoyHP:10},{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5}] },
+  { id:'armored_double', name:'Armored Double', description:'Fortified mimicry. Decoys are tougher.', runeSequence:['veil','flesh','chain'], color:'#8a7a6b', stats:{health:1.2,damage:0.7,speed:0.9,size:1.2}, behaviors:[{type:'decoy_on_hit',decoyHP:20},{type:'fortified',damageReduction:0.25}] },
+  { id:'vampiric_anchor', name:'Vampiric Anchor', description:'Spirit binder that drinks from pinned targets.', runeSequence:['veil','chain','breath'], color:'#6b4a5c', stats:{health:0.8,damage:0.7,speed:0.8,size:0.9}, behaviors:[{type:'root_on_hit',duration:2},{type:'life_steal',percent:0.3}] },
+  { id:'fortress_anchor', name:'Fortress Anchor', description:'Immense spirit that locks enemies and absorbs blows.', runeSequence:['veil','chain','flesh'], color:'#7a6b7a', stats:{health:1.5,damage:0.5,speed:0.6,size:1.5}, behaviors:[{type:'root_on_hit',duration:2},{type:'taunt',radius:70},{type:'fortified',damageReduction:0.3}] },
+  // 4-RUNE (24)
+  { id:'deathknight', name:'Deathknight', description:'Paramount undead warrior. Aura empowers all allies.', runeSequence:['breath','flesh','chain','veil'], color:'#c4a040', stats:{health:2.0,damage:1.5,speed:0.9,size:1.5}, behaviors:[{type:'rage',maxAttackSpeedBonus:1.5},{type:'fortified',damageReduction:0.3},{type:'aura_ally_buff',radius:80,damageBuff:0.25}] },
+  { id:'grave_warden', name:'Grave Warden', description:'Guardian spirit. Shields allies from death itself.', runeSequence:['breath','flesh','veil','chain'], color:'#6ba07a', stats:{health:1.8,damage:0.8,speed:0.8,size:1.4}, behaviors:[{type:'rage',maxAttackSpeedBonus:1.5},{type:'dodge',chance:0.3},{type:'protection_aura',radius:80,reduction:0.4}] },
+  { id:'lichs_hand', name:"Lich's Hand", description:'Fragment of a greater lich. Spawns lesser undead.', runeSequence:['breath','chain','flesh','veil'], color:'#4ac0a0', stats:{health:1.5,damage:0.6,speed:0.7,size:1.2}, behaviors:[{type:'life_tether',dps:4},{type:'spawn_minions',interval:8,minionType:'skeleton'}] },
+  { id:'deaths_embrace', name:"Death's Embrace", description:'Inescapable doom. Tethers to strongest enemy.', runeSequence:['breath','chain','veil','flesh'], color:'#5a3a4a', stats:{health:1.8,damage:0.5,speed:0.6,size:1.3}, behaviors:[{type:'life_tether',dps:5},{type:'root_on_hit',duration:3},{type:'fortified',damageReduction:0.4}] },
+  { id:'corpse_oracle', name:'Corpse Oracle', description:'Prophetic dead. Enemies miss constantly near it.', runeSequence:['breath','veil','flesh','chain'], color:'#8ab0c0', stats:{health:1.2,damage:0.3,speed:0.7,size:1.2}, behaviors:[{type:'miss_aura',radius:80,chance:0.5},{type:'aura_enemy_debuff',radius:80,attackSpeedReduction:0.3},{type:'taunt',radius:80}] },
+  { id:'doom_herald', name:'Doom Herald', description:'Harbinger of mass death. All enemies wither.', runeSequence:['breath','veil','chain','flesh'], color:'#4a2a3a', stats:{health:1.5,damage:0.3,speed:0.6,size:1.4}, behaviors:[{type:'damage_aura',radius:100,dps:3},{type:'aura_enemy_debuff',radius:100,attackSpeedReduction:0.3},{type:'fortified',damageReduction:0.25}] },
+  { id:'abomination', name:'Abomination', description:'Stitched monstrosity. Massive. Explodes on death.', runeSequence:['flesh','breath','chain','veil'], color:'#5a7a3a', stats:{health:2.5,damage:1.2,speed:0.6,size:2.0}, behaviors:[{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5},{type:'fortified',damageReduction:0.3},{type:'death_explode',radius:100,damage:30}] },
+  { id:'plague_bearer', name:'Plague Bearer', description:'Walking disease. Poisons everything nearby.', runeSequence:['flesh','breath','veil','chain'], color:'#7a8a3a', stats:{health:1.8,damage:0.8,speed:0.8,size:1.5}, behaviors:[{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5},{type:'damage_aura',radius:70,dps:3},{type:'aoe_slow',radius:70,percent:0.2}] },
+  { id:'bone_colossus', name:'Bone Colossus', description:'Towering skeleton construct. Knocks enemies aside.', runeSequence:['flesh','chain','breath','veil'], color:'#d4c4a0', stats:{health:2.5,damage:0.8,speed:0.5,size:2.0}, behaviors:[{type:'fortified',damageReduction:0.5},{type:'knockback',distance:40},{type:'life_steal',percent:0.2}] },
+  { id:'marrow_golem', name:'Marrow Golem', description:'Living bone that absorbs fallen allies to grow.', runeSequence:['flesh','chain','veil','breath'], color:'#b8a880', stats:{health:2.0,damage:0.7,speed:0.6,size:1.6}, behaviors:[{type:'fortified',damageReduction:0.4},{type:'scaling_on_kill',damagePerKill:0.5},{type:'regen',hpPerSecond:3}] },
+  { id:'shadow_stalker', name:'Shadow Stalker', description:'Perfect invisible predator. Always crits, fragile.', runeSequence:['flesh','veil','breath','chain'], color:'#2a2a3a', stats:{health:0.5,damage:2.0,speed:1.5,size:0.8}, behaviors:[{type:'ambush',damageMultiplier:4},{type:'phase'},{type:'life_steal',percent:0.25}] },
+  { id:'fleshweaver', name:'Fleshweaver', description:'Rebuilds fallen minions from scraps.', runeSequence:['flesh','veil','chain','breath'], color:'#6b4a5c', stats:{health:1.2,damage:0.8,speed:0.9,size:1.1}, behaviors:[{type:'ambush',damageMultiplier:2},{type:'resurrect_nearby',radius:80,cooldown:10}] },
+  { id:'soul_collector', name:'Soul Collector', description:'Harvester that grows stronger with every kill.', runeSequence:['chain','breath','flesh','veil'], color:'#8a4a6b', stats:{health:1.2,damage:1.0,speed:1.0,size:1.0}, behaviors:[{type:'life_steal',percent:0.3},{type:'scaling_on_kill',damagePerKill:1.0},{type:'phase'}] },
+  { id:'spirit_warden', name:'Spirit Warden', description:'Creates a sanctuary zone for the dead.', runeSequence:['chain','breath','veil','flesh'], color:'#5a8a7a', stats:{health:2.0,damage:0.3,speed:0.5,size:1.5}, behaviors:[{type:'protection_aura',radius:90,reduction:0.5},{type:'regen',hpPerSecond:3},{type:'taunt',radius:90}] },
+  { id:'ossuary', name:'Ossuary', description:'Bone shrine that endlessly produces minions.', runeSequence:['chain','flesh','breath','veil'], color:'#c4b490', stats:{health:3.0,damage:0.0,speed:0.0,size:2.0}, behaviors:[{type:'stationary'},{type:'spawn_minions',interval:6,minionType:'skeleton'},{type:'fortified',damageReduction:0.5}] },
+  { id:'crypt_gate', name:'Crypt Gate', description:'Portal that relocates enemies away from you.', runeSequence:['chain','flesh','veil','breath'], color:'#7a5a8a', stats:{health:2.5,damage:0.0,speed:0.0,size:1.8}, behaviors:[{type:'stationary'},{type:'knockback',distance:60},{type:'taunt',radius:90},{type:'fortified',damageReduction:0.4}] },
+  { id:'netherbinder', name:'Netherbinder', description:'Reality-warping entity. Massive zone of control.', runeSequence:['chain','veil','breath','flesh'], color:'#4a3a6b', stats:{health:1.5,damage:0.4,speed:0.7,size:1.3}, behaviors:[{type:'aoe_slow',radius:90,percent:0.6},{type:'damage_aura',radius:90,dps:3},{type:'life_steal',percent:0.2}] },
+  { id:'chain_wraith', name:'Chain Wraith', description:'Multi-target binder. Chains several enemies at once.', runeSequence:['chain','veil','flesh','breath'], color:'#5c4a7a', stats:{health:1.2,damage:0.5,speed:0.8,size:1.1}, behaviors:[{type:'aoe_slow',radius:80,percent:0.4},{type:'root_on_hit',duration:1.5},{type:'damage_aura',radius:80,dps:2}] },
+  { id:'revenant_king', name:'Revenant King', description:'Sovereign of the raised dead. Commands all nearby minions.', runeSequence:['veil','breath','flesh','chain'], color:'#c4a060', stats:{health:1.8,damage:1.5,speed:1.2,size:1.4}, behaviors:[{type:'teleport_attack'},{type:'aura_ally_buff',radius:90,damageBuff:0.3},{type:'rage',maxAttackSpeedBonus:1.5}] },
+  { id:'wight_lord', name:'Wight Lord', description:'Armored phantom lord that pins and punishes.', runeSequence:['veil','breath','chain','flesh'], color:'#5a6b8a', stats:{health:2.0,damage:1.0,speed:1.1,size:1.5}, behaviors:[{type:'teleport_attack'},{type:'root_on_hit',duration:2},{type:'fortified',damageReduction:0.35}] },
+  { id:'hungering_mimic', name:'Hungering Mimic', description:'Shape-stealer that devours and grows endlessly.', runeSequence:['veil','flesh','breath','chain'], color:'#7a5c7a', stats:{health:1.2,damage:1.2,speed:1.1,size:1.1}, behaviors:[{type:'decoy_on_hit',decoyHP:15},{type:'devour',healPercent:0.3,damageBuff:0.5,buffDuration:5},{type:'scaling_on_kill',damagePerKill:0.5}] },
+  { id:'pale_sentinel', name:'Pale Sentinel', description:'Mimicking guardian. Decoys everywhere.', runeSequence:['veil','flesh','chain','breath'], color:'#a0a0b0', stats:{health:1.8,damage:0.6,speed:0.8,size:1.4}, behaviors:[{type:'decoy_on_hit',decoyHP:25},{type:'fortified',damageReduction:0.3},{type:'regen',hpPerSecond:3}] },
+  { id:'reaper', name:'Reaper', description:'Spirit that chains souls and feeds on them.', runeSequence:['veil','chain','breath','flesh'], color:'#2a2a2a', stats:{health:1.0,damage:1.5,speed:1.2,size:1.0}, behaviors:[{type:'root_on_hit',duration:2.5},{type:'life_steal',percent:0.4},{type:'scaling_on_kill',damagePerKill:1.0}] },
+  { id:'tomb_warden', name:'Tomb Warden', description:'Immense spirit guardian. Locks down an area entirely.', runeSequence:['veil','chain','flesh','breath'], color:'#6b6b8a', stats:{health:2.5,damage:0.5,speed:0.5,size:1.8}, behaviors:[{type:'root_on_hit',duration:2},{type:'taunt',radius:90},{type:'fortified',damageReduction:0.4},{type:'protection_aura',radius:80,reduction:0.3}] },
+];
+
+// Behavior descriptions
+function describeBehavior(b) {
+  switch (b.type) {
+    case 'life_steal': return `Heals ${(b.percent*100).toFixed(0)}% on hit`;
+    case 'regen': return `Regenerates ${b.hpPerSecond} HP/s`;
+    case 'fortified': return `Takes ${(b.damageReduction*100).toFixed(0)}% less damage`;
+    case 'dodge': return `${(b.chance*100).toFixed(0)}% dodge chance`;
+    case 'ambush': return `First hit deals ${b.damageMultiplier}\u00d7 damage`;
+    case 'slow_on_hit': return `Slows enemies ${(b.percent*100).toFixed(0)}% for ${b.duration}s`;
+    case 'root_on_hit': return `Roots enemies for ${b.duration}s`;
+    case 'aoe_slow': return `Slows nearby enemies ${(b.percent*100).toFixed(0)}%`;
+    case 'phase': return 'Phases through enemies';
+    case 'stationary': return 'Cannot move';
+    case 'life_tether': return `Drains ${b.dps} DPS from nearest enemy`;
+    case 'rage': return `Up to ${b.maxAttackSpeedBonus}\u00d7 attack speed as HP drops`;
+    case 'devour': return `On kill: heals ${(b.healPercent*100).toFixed(0)}%, +${(b.damageBuff*100).toFixed(0)}% damage for ${b.buffDuration}s`;
+    case 'aura_ally_buff': return `Allies in range deal +${(b.damageBuff*100).toFixed(0)}% damage`;
+    case 'aura_enemy_debuff': return `Enemies in range attack ${(b.attackSpeedReduction*100).toFixed(0)}% slower`;
+    case 'death_explode': return `Explodes for ${b.damage} damage on death`;
+    case 'spawn_minions': return `Spawns a minion every ${b.interval}s`;
+    case 'resurrect_nearby': return `Revives a fallen ally every ${b.cooldown}s`;
+    case 'scaling_on_kill': return `+${b.damagePerKill} damage per kill`;
+    case 'teleport_attack': return 'Teleports to attack';
+    case 'decoy_on_hit': return 'Spawns a decoy when hit';
+    case 'knockback': return `Knocks enemies back ${b.distance}px`;
+    case 'damage_aura': return `Deals ${b.dps} DPS to nearby enemies`;
+    case 'protection_aura': return `Allies in range take ${(b.reduction*100).toFixed(0)}% less damage`;
+    case 'taunt': return 'Forces nearby enemies to target this unit';
+    case 'miss_aura': return `Enemies in range have ${(b.chance*100).toFixed(0)}% miss chance`;
+    case 'invulnerable_on_spawn': return `Invulnerable for ${b.duration}s after summoning`;
+    default: return b.type;
+  }
+}
+
+function behaviorCategory(type) {
+  const cats = {
+    fortified:'defensive', dodge:'defensive', invulnerable_on_spawn:'defensive', protection_aura:'defensive',
+    ambush:'offensive', rage:'offensive', scaling_on_kill:'offensive', damage_aura:'offensive',
+    slow_on_hit:'utility', root_on_hit:'utility', aoe_slow:'utility', taunt:'utility', knockback:'utility',
+    life_steal:'support', regen:'support', life_tether:'support', devour:'support', aura_ally_buff:'support', resurrect_nearby:'support',
+    phase:'special', stationary:'special', teleport_attack:'special', spawn_minions:'special', decoy_on_hit:'special', miss_aura:'special', death_explode:'special', aura_enemy_debuff:'special',
+  };
+  return cats[type] || 'special';
+}
+
+const catClass = { defensive:'bhv-defensive', offensive:'bhv-offensive', utility:'bhv-utility', support:'bhv-support', special:'bhv-special' };
+
+function statColor(v) {
+  if (v === 0) return 'stat-grey';
+  if (v > 1.0) return 'stat-green';
+  if (v === 1.0) return 'stat-white';
+  return 'stat-red';
+}
+
+function buildRuneSVG(runeSequence) {
+  const w = 80, h = 80;
+  const allRunes = ['breath','flesh','veil','chain'];
+  const usedSet = new Set(runeSequence);
+  let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Draw connection lines first (underneath)
+  for (let i = 0; i < runeSequence.length - 1; i++) {
+    const from = RUNE_POS[runeSequence[i]];
+    const to = RUNE_POS[runeSequence[i+1]];
+    svg += `<line x1="${from.cx}" y1="${from.cy}" x2="${to.cx}" y2="${to.cy}" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>`;
+  }
+
+  // Draw step numbers along the path
+  for (let i = 0; i < runeSequence.length; i++) {
+    const pos = RUNE_POS[runeSequence[i]];
+    // offset number slightly
+    const nx = pos.cx + 9;
+    const ny = pos.cy - 7;
+    svg += `<text x="${nx}" y="${ny}" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace" text-anchor="middle">${i+1}</text>`;
+  }
+
+  // Draw rune circles
+  for (const rune of allRunes) {
+    const p = RUNE_POS[rune];
+    const lit = usedSet.has(rune);
+    if (lit) {
+      svg += `<circle cx="${p.cx}" cy="${p.cy}" r="7" fill="${RUNE_COLORS[rune]}" stroke="#fff" stroke-width="1"/>`;
+    } else {
+      svg += `<circle cx="${p.cx}" cy="${p.cy}" r="6" fill="#222" stroke="none"/>`;
+    }
+  }
+
+  // Rune name labels for lit runes
+  for (const rune of allRunes) {
+    if (!usedSet.has(rune)) continue;
+    const p = RUNE_POS[rune];
+    let tx = p.cx, ty = p.cy;
+    if (rune === 'breath') { ty = p.cy - 11; }
+    else if (rune === 'flesh') { ty = p.cy + 16; }
+    else if (rune === 'veil') { tx = p.cx; ty = p.cy + 16; }
+    else if (rune === 'chain') { tx = p.cx; ty = p.cy + 16; }
+    svg += `<text x="${tx}" y="${ty}" fill="${RUNE_COLORS[rune]}" font-size="6" font-family="monospace" text-anchor="middle" font-weight="bold">${RUNE_NAMES[rune]}</text>`;
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function buildCard(a) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.runes = a.runeSequence.length;
+  card.style.borderTopColor = a.color;
+
+  // Rune sequence pills
+  const seqHTML = a.runeSequence.map(r =>
+    `<span class="rune-pill" style="background:${RUNE_COLORS[r]}">${RUNE_NAMES[r]}</span>`
+  ).join('<span class="rune-arrow">\u2192</span>');
+
+  // Stats
+  const statNames = [{k:'health',l:'HP'},{k:'damage',l:'Dmg'},{k:'speed',l:'Spd'},{k:'size',l:'Size'}];
+  const statsHTML = statNames.map(s => {
+    const v = a.stats[s.k];
+    return `<div class="stat ${statColor(v)}"><span class="stat-label">${s.l}</span><span class="stat-value">${v.toFixed(1)}\u00d7</span></div>`;
+  }).join('');
+
+  // Behaviors
+  const bhvHTML = a.behaviors.map(b => {
+    const cat = behaviorCategory(b.type);
+    return `<span class="behavior-pill ${catClass[cat]}">${describeBehavior(b)}</span>`;
+  }).join('');
+
+  card.innerHTML = `
+    <div class="card-top">
+      ${buildRuneSVG(a.runeSequence)}
+      <div>
+        <div class="creature-name" style="color:${a.color}">${a.name}</div>
+        <div class="creature-desc">${a.description}</div>
+      </div>
+    </div>
+    <div class="rune-seq">${seqHTML}</div>
+    <div class="stats-bar">${statsHTML}</div>
+    <div class="behaviors">${bhvHTML}</div>
+  `;
+  return card;
+}
+
+// Render
+const grid = document.getElementById('grid');
+const countEl = document.getElementById('count');
+let currentFilter = 'all';
+
+function render() {
+  grid.innerHTML = '';
+  let shown = 0;
+  for (const a of ARCHETYPES) {
+    if (currentFilter !== 'all' && a.runeSequence.length !== parseInt(currentFilter)) continue;
+    grid.appendChild(buildCard(a));
+    shown++;
+  }
+  countEl.textContent = `${shown} creature${shown !== 1 ? 's' : ''}`;
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    render();
+  });
+});
+
+-->
+</body>
+</html>
